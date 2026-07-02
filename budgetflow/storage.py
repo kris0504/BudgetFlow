@@ -7,6 +7,17 @@ from typing import Iterable
 from budgetflow.errors import NotFoundError
 from budgetflow.models import Budget, Transaction
 
+DEFAULT_CATEGORIES = (
+    "Food",
+    "Transport",
+    "Salary",
+    "Bills",
+    "Shopping",
+    "Entertainment",
+    "Health",
+    "Other",
+)
+
 
 class SQLiteStorage:
 
@@ -27,6 +38,12 @@ class SQLiteStorage:
     def _create_tables(self) -> None:
         cursor = self._connection.cursor()
         cursor.execute("""
+            CREATE TABLE IF NOT EXISTS categories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE
+            )
+            """)
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS transactions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 amount REAL NOT NULL,
@@ -46,8 +63,36 @@ class SQLiteStorage:
             )
             """)
         self._connection.commit()
+        self._seed_default_categories()
+
+    def _seed_default_categories(self) -> None:
+        for category in DEFAULT_CATEGORIES:
+            self.add_category(category)
+
+    def add_category(self, name: str) -> str:
+        category = Transaction._validate_category(name)
+        cursor = self._connection.cursor()
+        cursor.execute(
+            "INSERT OR IGNORE INTO categories (name) VALUES (?)",
+            (category,),
+        )
+        self._connection.commit()
+        return category
+
+    def list_categories(self) -> list[str]:
+        cursor = self._connection.cursor()
+        cursor.execute("""
+            SELECT name FROM categories
+            UNION
+            SELECT category FROM transactions
+            UNION
+            SELECT category FROM budgets
+            ORDER BY name COLLATE NOCASE
+            """)
+        return [row[0] for row in cursor.fetchall()]
 
     def add_transaction(self, transaction: Transaction) -> Transaction:
+        self.add_category(transaction.category)
         cursor = self._connection.cursor()
         cursor.execute(
             """
@@ -64,6 +109,7 @@ class SQLiteStorage:
     def update_transaction(
         self, transaction_id: int, transaction: Transaction
     ) -> Transaction:
+        self.add_category(transaction.category)
         cursor = self._connection.cursor()
         cursor.execute(
             """
@@ -139,6 +185,7 @@ class SQLiteStorage:
         return [Transaction.from_row(row) for row in cursor.fetchall()]
 
     def set_budget(self, budget: Budget) -> Budget:
+        self.add_category(budget.category)
         cursor = self._connection.cursor()
         cursor.execute(
             """
@@ -180,4 +227,6 @@ class SQLiteStorage:
         cursor = self._connection.cursor()
         cursor.execute("DELETE FROM transactions")
         cursor.execute("DELETE FROM budgets")
+        cursor.execute("DELETE FROM categories")
         self._connection.commit()
+        self._seed_default_categories()

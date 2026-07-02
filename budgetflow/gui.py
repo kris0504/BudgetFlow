@@ -34,11 +34,19 @@ class BudgetFlowApp(ctk.CTk):
 
         self.transactions_tab = self.tabs.add("Transactions")
         self.budgets_tab = self.tabs.add("Budgets")
+        self.categories_tab = self.tabs.add("Categories")
         self.statistics_tab = self.tabs.add("Statistics")
 
         self._create_transactions_tab()
         self._create_budgets_tab()
+        self._create_categories_tab()
         self._create_statistics_tab()
+
+    def _category_values(self) -> list[str]:
+        categories = self.manager.list_categories()
+        if categories:
+            return categories
+        return ["Other"]
 
     def _create_transactions_tab(self) -> None:
         self.transactions_tab.grid_columnconfigure(0, weight=0)
@@ -55,8 +63,9 @@ class BudgetFlowApp(ctk.CTk):
         self.amount_entry = ctk.CTkEntry(form, placeholder_text="Amount")
         self.amount_entry.pack(padx=15, pady=8)
 
-        self.category_entry = ctk.CTkEntry(form, placeholder_text="Category")
-        self.category_entry.pack(padx=15, pady=8)
+        ctk.CTkLabel(form, text="Category").pack(padx=15, pady=(8, 2))
+        self.category_menu = ctk.CTkOptionMenu(form, values=self._category_values())
+        self.category_menu.pack(padx=15, pady=(0, 8))
 
         self.type_menu = ctk.CTkOptionMenu(form, values=["expense", "income"])
         self.type_menu.set("expense")
@@ -97,8 +106,11 @@ class BudgetFlowApp(ctk.CTk):
             padx=15, pady=(15, 10)
         )
 
-        self.budget_category_entry = ctk.CTkEntry(form, placeholder_text="Category")
-        self.budget_category_entry.pack(padx=15, pady=8)
+        ctk.CTkLabel(form, text="Category").pack(padx=15, pady=(8, 2))
+        self.budget_category_menu = ctk.CTkOptionMenu(
+            form, values=self._category_values()
+        )
+        self.budget_category_menu.pack(padx=15, pady=(0, 8))
 
         ctk.CTkLabel(form, text="Budget month").pack(padx=15, pady=(8, 2))
         self.budget_month_entry = DateEntry(
@@ -121,6 +133,28 @@ class BudgetFlowApp(ctk.CTk):
 
         self.budgets_box = ctk.CTkTextbox(self.budgets_tab)
         self.budgets_box.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+
+    def _create_categories_tab(self) -> None:
+        self.categories_tab.grid_columnconfigure(0, weight=0)
+        self.categories_tab.grid_columnconfigure(1, weight=1)
+        self.categories_tab.grid_rowconfigure(0, weight=1)
+
+        form = ctk.CTkFrame(self.categories_tab)
+        form.grid(row=0, column=0, padx=10, pady=10, sticky="ns")
+
+        ctk.CTkLabel(form, text="Create category", font=("Arial", 18, "bold")).pack(
+            padx=15, pady=(15, 10)
+        )
+
+        self.new_category_entry = ctk.CTkEntry(form, placeholder_text="Category name")
+        self.new_category_entry.pack(padx=15, pady=8)
+
+        ctk.CTkButton(form, text="Add category", command=self.add_category).pack(
+            padx=15, pady=(12, 8)
+        )
+
+        self.categories_box = ctk.CTkTextbox(self.categories_tab)
+        self.categories_box.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
 
     def _create_statistics_tab(self) -> None:
         self.statistics_tab.grid_columnconfigure(0, weight=1)
@@ -147,11 +181,22 @@ class BudgetFlowApp(ctk.CTk):
         self.statistics_box = ctk.CTkTextbox(frame)
         self.statistics_box.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
 
+    def add_category(self) -> None:
+        try:
+            category = self.manager.add_category(self.new_category_entry.get())
+            self.new_category_entry.delete(0, "end")
+            self.refresh_data()
+            self.category_menu.set(category)
+            self.budget_category_menu.set(category)
+            messagebox.showinfo("BudgetFlow", "Category saved successfully.")
+        except BudgetFlowError as error:
+            messagebox.showerror("BudgetFlow", str(error))
+
     def add_transaction(self) -> None:
         try:
             self.manager.add_transaction(
                 amount=float(self.amount_entry.get()),
-                category=self.category_entry.get(),
+                category=self.category_menu.get(),
                 transaction_type=self.type_menu.get(),
                 description=self.description_entry.get(),
                 transaction_date=self.date_entry.get_date().isoformat(),
@@ -165,7 +210,7 @@ class BudgetFlowApp(ctk.CTk):
     def save_budget(self) -> None:
         try:
             self.manager.set_budget(
-                category=self.budget_category_entry.get(),
+                category=self.budget_category_menu.get(),
                 month=self.budget_month_entry.get_date().strftime("%Y-%m"),
                 limit=float(self.budget_limit_entry.get()),
             )
@@ -176,9 +221,43 @@ class BudgetFlowApp(ctk.CTk):
             messagebox.showerror("BudgetFlow", str(error))
 
     def refresh_data(self) -> None:
+        self._refresh_category_menus()
+        self._refresh_categories()
         self._refresh_transactions()
         self._refresh_budgets()
         self._refresh_statistics()
+
+    def _refresh_category_menus(self) -> None:
+        categories = self._category_values()
+
+        current_transaction_category = self.category_menu.get()
+        current_budget_category = self.budget_category_menu.get()
+
+        self.category_menu.configure(values=categories)
+        self.budget_category_menu.configure(values=categories)
+
+        if current_transaction_category in categories:
+            self.category_menu.set(current_transaction_category)
+        else:
+            self.category_menu.set(categories[0])
+
+        if current_budget_category in categories:
+            self.budget_category_menu.set(current_budget_category)
+        else:
+            self.budget_category_menu.set(categories[0])
+
+    def _refresh_categories(self) -> None:
+        self.categories_box.configure(state="normal")
+        self.categories_box.delete("1.0", "end")
+
+        categories = self.manager.list_categories()
+        if not categories:
+            self.categories_box.insert("end", "No categories yet.")
+        else:
+            for category in categories:
+                self.categories_box.insert("end", f"- {category}\n")
+
+        self.categories_box.configure(state="disabled")
 
     def _refresh_transactions(self) -> None:
         self.transactions_box.configure(state="normal")
@@ -277,12 +356,11 @@ class BudgetFlowApp(ctk.CTk):
 
     def _clear_transaction_form(self) -> None:
         self.amount_entry.delete(0, "end")
-        self.category_entry.delete(0, "end")
         self.description_entry.delete(0, "end")
         # self.date_entry.delete(0, "end")
         self.type_menu.set("expense")
 
     def _clear_budget_form(self) -> None:
-        self.budget_category_entry.delete(0, "end")
+        # self.budget_category_entry.delete(0, "end")
         # self.budget_month_entry.delete(0, "end")
         self.budget_limit_entry.delete(0, "end")
