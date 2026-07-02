@@ -3,6 +3,7 @@ from __future__ import annotations
 from tkinter import messagebox
 
 import customtkinter as ctk
+from tkcalendar import DateEntry
 
 from budgetflow.charts import ChartGenerator
 from budgetflow.errors import BudgetFlowError
@@ -61,8 +62,16 @@ class BudgetFlowApp(ctk.CTk):
         self.type_menu.set("expense")
         self.type_menu.pack(padx=15, pady=8)
 
-        self.date_entry = ctk.CTkEntry(form, placeholder_text="Date YYYY-MM-DD")
-        self.date_entry.pack(padx=15, pady=8)
+        ctk.CTkLabel(form, text="Date").pack(padx=15, pady=(8, 2))
+        self.date_entry = DateEntry(
+            form,
+            date_pattern="yyyy-mm-dd",
+            width=18,
+            background="#1f6aa5",
+            foreground="white",
+            borderwidth=2,
+        )
+        self.date_entry.pack(padx=15, pady=(0, 8))
 
         self.description_entry = ctk.CTkEntry(form, placeholder_text="Description")
         self.description_entry.pack(padx=15, pady=8)
@@ -91,8 +100,16 @@ class BudgetFlowApp(ctk.CTk):
         self.budget_category_entry = ctk.CTkEntry(form, placeholder_text="Category")
         self.budget_category_entry.pack(padx=15, pady=8)
 
-        self.budget_month_entry = ctk.CTkEntry(form, placeholder_text="Month YYYY-MM")
-        self.budget_month_entry.pack(padx=15, pady=8)
+        ctk.CTkLabel(form, text="Budget month").pack(padx=15, pady=(8, 2))
+        self.budget_month_entry = DateEntry(
+            form,
+            date_pattern="yyyy-mm-dd",
+            width=18,
+            background="#1f6aa5",
+            foreground="white",
+            borderwidth=2,
+        )
+        self.budget_month_entry.pack(padx=15, pady=(0, 8))
 
         self.budget_limit_entry = ctk.CTkEntry(form, placeholder_text="Limit")
         self.budget_limit_entry.pack(padx=15, pady=8)
@@ -137,7 +154,7 @@ class BudgetFlowApp(ctk.CTk):
                 category=self.category_entry.get(),
                 transaction_type=self.type_menu.get(),
                 description=self.description_entry.get(),
-                transaction_date=self.date_entry.get() or None,
+                transaction_date=self.date_entry.get_date().isoformat(),
             )
             self._clear_transaction_form()
             self.refresh_data()
@@ -149,7 +166,7 @@ class BudgetFlowApp(ctk.CTk):
         try:
             self.manager.set_budget(
                 category=self.budget_category_entry.get(),
-                month=self.budget_month_entry.get(),
+                month=self.budget_month_entry.get_date().strftime("%Y-%m"),
                 limit=float(self.budget_limit_entry.get()),
             )
             self._clear_budget_form()
@@ -262,10 +279,10 @@ class BudgetFlowApp(ctk.CTk):
         self.amount_entry.delete(0, "end")
         self.category_entry.delete(0, "end")
         self.description_entry.delete(0, "end")
-        self.date_entry.delete(0, "end")
+        # self.date_entry.delete(0, "end")
         self.type_menu.set("expense")
 
     def _clear_budget_form(self) -> None:
         self.budget_category_entry.delete(0, "end")
-        self.budget_month_entry.delete(0, "end")
+        # self.budget_month_entry.delete(0, "end")
         self.budget_limit_entry.delete(0, "end")
