@@ -18,7 +18,7 @@ class BudgetFlowApp(ctk.CTk):
         self.manager = manager
 
         self.title("BudgetFlow")
-        self.geometry("950x650")
+        self.geometry("1050x780")
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
 
@@ -91,19 +91,26 @@ class BudgetFlowApp(ctk.CTk):
         refresh_button = ctk.CTkButton(form, text="Refresh", command=self.refresh_data)
         refresh_button.pack(padx=15, pady=8)
 
-        ctk.CTkLabel(form, text="Delete transaction", font=("Arial", 16, "bold")).pack(
-            padx=15, pady=(20, 6)
+        ctk.CTkLabel(form, text="Delete transaction", font=("Arial", 15, "bold")).pack(
+            padx=15, pady=(12, 4)
         )
         self.delete_transaction_id_entry = ctk.CTkEntry(
             form, placeholder_text="Transaction ID"
         )
         self.delete_transaction_id_entry.pack(padx=15, pady=8)
 
-        ctk.CTkButton(
-            form, text="Delete transaction", command=self.delete_transaction
-        ).pack(padx=15, pady=8)
-        self.transactions_box = ctk.CTkTextbox(self.transactions_tab)
-        self.transactions_box.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+        self.delete_transaction_button = ctk.CTkButton(
+            form,
+            text="Delete transaction",
+            command=self.delete_transaction,
+            height=38,
+        )
+        self.delete_transaction_button.pack(padx=15, pady=(6, 8), fill="x")
+        self.transactions_frame = ctk.CTkScrollableFrame(
+            self.transactions_tab,
+            fg_color="#1a1a1a",
+        )
+        self.transactions_frame.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
 
     def _create_budgets_tab(self) -> None:
         self.budgets_tab.grid_columnconfigure(0, weight=0)
