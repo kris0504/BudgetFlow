@@ -91,6 +91,17 @@ class BudgetFlowApp(ctk.CTk):
         refresh_button = ctk.CTkButton(form, text="Refresh", command=self.refresh_data)
         refresh_button.pack(padx=15, pady=8)
 
+        ctk.CTkLabel(form, text="Delete transaction", font=("Arial", 16, "bold")).pack(
+            padx=15, pady=(20, 6)
+        )
+        self.delete_transaction_id_entry = ctk.CTkEntry(
+            form, placeholder_text="Transaction ID"
+        )
+        self.delete_transaction_id_entry.pack(padx=15, pady=8)
+
+        ctk.CTkButton(
+            form, text="Delete transaction", command=self.delete_transaction
+        ).pack(padx=15, pady=8)
         self.transactions_box = ctk.CTkTextbox(self.transactions_tab)
         self.transactions_box.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
 
@@ -145,7 +156,18 @@ class BudgetFlowApp(ctk.CTk):
         ctk.CTkLabel(form, text="Create category", font=("Arial", 18, "bold")).pack(
             padx=15, pady=(15, 10)
         )
+        ctk.CTkLabel(form, text="Delete category", font=("Arial", 16, "bold")).pack(
+            padx=15, pady=(22, 6)
+        )
 
+        self.delete_category_menu = ctk.CTkOptionMenu(
+            form, values=self._category_values()
+        )
+        self.delete_category_menu.pack(padx=15, pady=8)
+
+        ctk.CTkButton(form, text="Delete category", command=self.delete_category).pack(
+            padx=15, pady=8
+        )
         self.new_category_entry = ctk.CTkEntry(form, placeholder_text="Category name")
         self.new_category_entry.pack(padx=15, pady=8)
 
@@ -188,7 +210,20 @@ class BudgetFlowApp(ctk.CTk):
             self.refresh_data()
             self.category_menu.set(category)
             self.budget_category_menu.set(category)
+            self.delete_category_menu.set(category)
             messagebox.showinfo("BudgetFlow", "Category saved successfully.")
+        except BudgetFlowError as error:
+            messagebox.showerror("BudgetFlow", str(error))
+
+    def delete_category(self) -> None:
+        category = self.delete_category_menu.get()
+        if not messagebox.askyesno("BudgetFlow", f"Delete category '{category}'?"):
+            return
+
+        try:
+            self.manager.delete_category(category)
+            self.refresh_data()
+            messagebox.showinfo("BudgetFlow", "Category deleted successfully.")
         except BudgetFlowError as error:
             messagebox.showerror("BudgetFlow", str(error))
 
@@ -204,6 +239,21 @@ class BudgetFlowApp(ctk.CTk):
             self._clear_transaction_form()
             self.refresh_data()
             messagebox.showinfo("BudgetFlow", "Transaction saved successfully.")
+        except (BudgetFlowError, ValueError) as error:
+            messagebox.showerror("BudgetFlow", str(error))
+
+    def delete_transaction(self) -> None:
+        try:
+            transaction_id = int(self.delete_transaction_id_entry.get())
+            if not messagebox.askyesno(
+                "BudgetFlow", f"Delete transaction #{transaction_id}?"
+            ):
+                return
+
+            self.manager.delete_transaction(transaction_id)
+            self.delete_transaction_id_entry.delete(0, "end")
+            self.refresh_data()
+            messagebox.showinfo("BudgetFlow", "Transaction deleted successfully.")
         except (BudgetFlowError, ValueError) as error:
             messagebox.showerror("BudgetFlow", str(error))
 
@@ -230,11 +280,13 @@ class BudgetFlowApp(ctk.CTk):
     def _refresh_category_menus(self) -> None:
         categories = self._category_values()
 
+        current_delete_category = self.delete_category_menu.get()
         current_transaction_category = self.category_menu.get()
         current_budget_category = self.budget_category_menu.get()
 
         self.category_menu.configure(values=categories)
         self.budget_category_menu.configure(values=categories)
+        self.delete_category_menu.configure(values=categories)
 
         if current_transaction_category in categories:
             self.category_menu.set(current_transaction_category)
@@ -245,6 +297,10 @@ class BudgetFlowApp(ctk.CTk):
             self.budget_category_menu.set(current_budget_category)
         else:
             self.budget_category_menu.set(categories[0])
+        if current_delete_category in categories:
+            self.delete_category_menu.set(current_delete_category)
+        else:
+            self.delete_category_menu.set(categories[0])
 
     def _refresh_categories(self) -> None:
         self.categories_box.configure(state="normal")

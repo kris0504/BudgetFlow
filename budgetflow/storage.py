@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 from typing import Iterable
 
-from budgetflow.errors import NotFoundError
+from budgetflow.errors import NotFoundError, ValidationError
 from budgetflow.models import Budget, Transaction
 
 DEFAULT_CATEGORIES = (
@@ -90,6 +90,33 @@ class SQLiteStorage:
             ORDER BY name COLLATE NOCASE
             """)
         return [row[0] for row in cursor.fetchall()]
+
+    def delete_category(self, name: str) -> None:
+        category = Transaction._validate_category(name)
+        cursor = self._connection.cursor()
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM transactions WHERE category = ?",
+            (category,),
+        )
+        transactions_count = cursor.fetchone()[0]
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM budgets WHERE category = ?",
+            (category,),
+        )
+        budgets_count = cursor.fetchone()[0]
+
+        if transactions_count > 0 or budgets_count > 0:
+            raise ValidationError(
+                "Cannot delete category because it is used by transactions or budgets."
+            )
+
+        cursor.execute("DELETE FROM categories WHERE name = ?", (category,))
+        if cursor.rowcount == 0:
+            raise NotFoundError(f"Category {category} was not found.")
+
+        self._connection.commit()
 
     def add_transaction(self, transaction: Transaction) -> Transaction:
         self.add_category(transaction.category)

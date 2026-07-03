@@ -17,6 +17,9 @@ class FinanceManager:
     def list_categories(self) -> list[str]:
         return self.storage.list_categories()
 
+    def delete_category(self, name: str) -> None:
+        self.storage.delete_category(name)
+
     def add_transaction(
         self,
         amount: float,
