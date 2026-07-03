@@ -128,7 +128,7 @@ class BudgetFlowApp(ctk.CTk):
         self.budget_category_menu = ctk.CTkOptionMenu(
             form, values=self._category_values()
         )
-        self.budget_category_menu.pack(padx=15, pady=(0, 8))
+        self.budget_category_menu.pack(padx=15, pady=(0, 8), fill="x")
 
         ctk.CTkLabel(form, text="Budget month").pack(padx=15, pady=(8, 2))
         self.budget_month_entry = DateEntry(
@@ -147,10 +147,13 @@ class BudgetFlowApp(ctk.CTk):
         save_budget_button = ctk.CTkButton(
             form, text="Save budget", command=self.save_budget
         )
-        save_budget_button.pack(padx=15, pady=(12, 8))
+        save_budget_button.pack(padx=15, pady=(12, 8), fill="x")
 
-        self.budgets_box = ctk.CTkTextbox(self.budgets_tab)
-        self.budgets_box.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+        self.budgets_frame = ctk.CTkScrollableFrame(
+            self.budgets_tab,
+            fg_color="#1a1a1a",
+        )
+        self.budgets_frame.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
 
     def _create_categories_tab(self) -> None:
         self.categories_tab.grid_columnconfigure(0, weight=0)
@@ -163,27 +166,32 @@ class BudgetFlowApp(ctk.CTk):
         ctk.CTkLabel(form, text="Create category", font=("Arial", 18, "bold")).pack(
             padx=15, pady=(15, 10)
         )
+
+        self.new_category_entry = ctk.CTkEntry(form, placeholder_text="Category name")
+        self.new_category_entry.pack(padx=15, pady=8)
+
+        ctk.CTkButton(form, text="Add category", command=self.add_category).pack(
+            padx=15, pady=(12, 8), fill="x"
+        )
+
         ctk.CTkLabel(form, text="Delete category", font=("Arial", 16, "bold")).pack(
-            padx=15, pady=(22, 6)
+            padx=15, pady=(25, 6)
         )
 
         self.delete_category_menu = ctk.CTkOptionMenu(
             form, values=self._category_values()
         )
-        self.delete_category_menu.pack(padx=15, pady=8)
+        self.delete_category_menu.pack(padx=15, pady=8, fill="x")
 
         ctk.CTkButton(form, text="Delete category", command=self.delete_category).pack(
-            padx=15, pady=8
-        )
-        self.new_category_entry = ctk.CTkEntry(form, placeholder_text="Category name")
-        self.new_category_entry.pack(padx=15, pady=8)
-
-        ctk.CTkButton(form, text="Add category", command=self.add_category).pack(
-            padx=15, pady=(12, 8)
+            padx=15, pady=8, fill="x"
         )
 
-        self.categories_box = ctk.CTkTextbox(self.categories_tab)
-        self.categories_box.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+        self.categories_frame = ctk.CTkScrollableFrame(
+            self.categories_tab,
+            fg_color="#1a1a1a",
+        )
+        self.categories_frame.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
 
     def _create_statistics_tab(self) -> None:
         self.statistics_tab.grid_columnconfigure(0, weight=1)
@@ -200,15 +208,20 @@ class BudgetFlowApp(ctk.CTk):
         ctk.CTkButton(
             button_frame, text="Refresh statistics", command=self.refresh_data
         ).pack(side="left", padx=8, pady=8)
+
         ctk.CTkButton(
             button_frame, text="Generate report", command=self.generate_report
         ).pack(side="left", padx=8, pady=8)
+
         ctk.CTkButton(
             button_frame, text="Generate charts", command=self.generate_charts
         ).pack(side="left", padx=8, pady=8)
 
-        self.statistics_box = ctk.CTkTextbox(frame)
-        self.statistics_box.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
+        self.statistics_frame = ctk.CTkScrollableFrame(
+            frame,
+            fg_color="#1a1a1a",
+        )
+        self.statistics_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
 
     def add_category(self) -> None:
         try:
@@ -277,6 +290,30 @@ class BudgetFlowApp(ctk.CTk):
         except (BudgetFlowError, ValueError) as error:
             messagebox.showerror("BudgetFlow", str(error))
 
+    def generate_report(self) -> None:
+        try:
+            path = ReportGenerator(self.manager.statistics()).monthly_text_report()
+            messagebox.showinfo("BudgetFlow", f"Report generated: {path}")
+        except ValueError as error:
+            messagebox.showerror("BudgetFlow", str(error))
+
+    def generate_charts(self) -> None:
+        try:
+            generator = ChartGenerator(self.manager.statistics())
+            paths = [generator.monthly_balance_chart()]
+
+            try:
+                paths.append(generator.expenses_by_category_chart())
+            except ValueError:
+                pass
+
+            messagebox.showinfo(
+                "BudgetFlow",
+                "Charts generated:\n" + "\n".join(str(path) for path in paths),
+            )
+        except ValueError as error:
+            messagebox.showerror("BudgetFlow", str(error))
+
     def refresh_data(self) -> None:
         self._refresh_category_menus()
         self._refresh_categories()
@@ -310,112 +347,351 @@ class BudgetFlowApp(ctk.CTk):
             self.delete_category_menu.set(categories[0])
 
     def _refresh_categories(self) -> None:
-        self.categories_box.configure(state="normal")
-        self.categories_box.delete("1.0", "end")
+        for widget in self.categories_frame.winfo_children():
+            widget.destroy()
 
         categories = self.manager.list_categories()
-        if not categories:
-            self.categories_box.insert("end", "No categories yet.")
-        else:
-            for category in categories:
-                self.categories_box.insert("end", f"- {category}\n")
 
-        self.categories_box.configure(state="disabled")
+        if not categories:
+            ctk.CTkLabel(
+                self.categories_frame,
+                text="No categories yet.",
+                font=("Arial", 15),
+                text_color="gray",
+            ).pack(padx=15, pady=15, anchor="w")
+            return
+
+        for category in categories:
+            card = ctk.CTkFrame(
+                self.categories_frame,
+                fg_color="#242424",
+                corner_radius=10,
+            )
+            card.pack(fill="x", padx=10, pady=5)
+
+            ctk.CTkLabel(
+                card,
+                text=category,
+                font=("Arial", 15, "bold"),
+                anchor="w",
+            ).pack(side="left", padx=12, pady=10)
+
+            ctk.CTkLabel(
+                card,
+                text="Category",
+                font=("Arial", 12),
+                text_color="gray",
+                anchor="e",
+            ).pack(side="right", padx=12, pady=10)
 
     def _refresh_transactions(self) -> None:
-        self.transactions_box.configure(state="normal")
-        self.transactions_box.delete("1.0", "end")
+        for widget in self.transactions_frame.winfo_children():
+            widget.destroy()
 
         transactions = self.manager.list_transactions()
-        if not transactions:
-            self.transactions_box.insert("end", "No transactions yet.")
-        else:
-            for transaction in transactions:
-                self.transactions_box.insert(
-                    "end",
-                    f"#{transaction.id} | {transaction.transaction_date} | "
-                    f"{transaction.transaction_type.value:<7} | "
-                    f"{transaction.category:<15} | {transaction.amount:>8.2f} | "
-                    f"{transaction.description}\n",
-                )
 
-        self.transactions_box.configure(state="disabled")
+        if not transactions:
+            ctk.CTkLabel(
+                self.transactions_frame,
+                text="No transactions yet.",
+                font=("Arial", 15),
+                text_color="gray",
+            ).pack(padx=15, pady=15, anchor="w")
+            return
+
+        for transaction in transactions:
+            transaction_type = transaction.transaction_type
+            if hasattr(transaction_type, "value"):
+                transaction_type = transaction_type.value
+
+            date_text = transaction.transaction_date
+            if hasattr(date_text, "isoformat"):
+                date_text = date_text.isoformat()
+
+            if transaction_type == "income":
+                amount_text = f"+{transaction.amount:.2f} BGN"
+                amount_color = "#4ade80"
+            else:
+                amount_text = f"-{transaction.amount:.2f} BGN"
+                amount_color = "#f87171"
+
+            card = ctk.CTkFrame(
+                self.transactions_frame,
+                fg_color="#242424",
+                corner_radius=10,
+            )
+            card.pack(fill="x", padx=10, pady=6)
+
+            top_row = ctk.CTkFrame(card, fg_color="transparent")
+            top_row.pack(fill="x", padx=12, pady=(10, 4))
+
+            ctk.CTkLabel(
+                top_row,
+                text=f"#{transaction.id}  {transaction.category}",
+                font=("Arial", 15, "bold"),
+                anchor="w",
+            ).pack(side="left")
+
+            ctk.CTkLabel(
+                top_row,
+                text=amount_text,
+                font=("Arial", 15, "bold"),
+                text_color=amount_color,
+                anchor="e",
+            ).pack(side="right")
+
+            middle_row = ctk.CTkFrame(card, fg_color="transparent")
+            middle_row.pack(fill="x", padx=12, pady=(0, 4))
+
+            ctk.CTkLabel(
+                middle_row,
+                text=f"{date_text}  •  {transaction_type}",
+                font=("Arial", 12),
+                text_color="gray",
+                anchor="w",
+            ).pack(side="left")
+
+            description = transaction.description
+            if not description:
+                description = "No description"
+
+            ctk.CTkLabel(
+                card,
+                text=description,
+                font=("Arial", 13),
+                anchor="w",
+                justify="left",
+                wraplength=620,
+            ).pack(fill="x", padx=12, pady=(0, 10))
 
     def _refresh_budgets(self) -> None:
-        self.budgets_box.configure(state="normal")
-        self.budgets_box.delete("1.0", "end")
+        for widget in self.budgets_frame.winfo_children():
+            widget.destroy()
 
         statuses = self.manager.all_budget_statuses()
-        if not statuses:
-            self.budgets_box.insert("end", "No budgets yet.")
-        else:
-            for status in statuses:
-                warning = "  !!! EXCEEDED" if status["is_exceeded"] else ""
-                self.budgets_box.insert(
-                    "end",
-                    f"{status['month']} | {status['category']:<15} | "
-                    f"spent {status['spent']:>8.2f} / {status['limit']:>8.2f} | "
-                    f"remaining {status['remaining']:>8.2f}{warning}\n",
-                )
 
-        self.budgets_box.configure(state="disabled")
+        if not statuses:
+            ctk.CTkLabel(
+                self.budgets_frame,
+                text="No budgets yet.",
+                font=("Arial", 15),
+                text_color="gray",
+            ).pack(padx=15, pady=15, anchor="w")
+            return
+
+        for status in statuses:
+            is_exceeded = status["is_exceeded"]
+
+            if is_exceeded:
+                remaining_text = f"Exceeded by {abs(status['remaining']):.2f} BGN"
+                remaining_color = "#f87171"
+                card_color = "#2b1d1d"
+            else:
+                remaining_text = f"Remaining {status['remaining']:.2f} BGN"
+                remaining_color = "#4ade80"
+                card_color = "#242424"
+
+            card = ctk.CTkFrame(
+                self.budgets_frame,
+                fg_color=card_color,
+                corner_radius=10,
+            )
+            card.pack(fill="x", padx=10, pady=6)
+
+            top_row = ctk.CTkFrame(card, fg_color="transparent")
+            top_row.pack(fill="x", padx=12, pady=(10, 4))
+
+            ctk.CTkLabel(
+                top_row,
+                text=f"{status['category']}",
+                font=("Arial", 15, "bold"),
+                anchor="w",
+            ).pack(side="left")
+
+            ctk.CTkLabel(
+                top_row,
+                text=status["month"],
+                font=("Arial", 13),
+                text_color="gray",
+                anchor="e",
+            ).pack(side="right")
+
+            ctk.CTkLabel(
+                card,
+                text=f"Spent {status['spent']:.2f} / {status['limit']:.2f} BGN",
+                font=("Arial", 13),
+                anchor="w",
+            ).pack(fill="x", padx=12, pady=(2, 2))
+
+            ctk.CTkLabel(
+                card,
+                text=remaining_text,
+                font=("Arial", 13, "bold"),
+                text_color=remaining_color,
+                anchor="w",
+            ).pack(fill="x", padx=12, pady=(0, 10))
 
     def _refresh_statistics(self) -> None:
+        for widget in self.statistics_frame.winfo_children():
+            widget.destroy()
+
         statistics = self.manager.statistics()
 
-        lines = [
-            f"Total income:   {statistics.total_income():.2f}",
-            f"Total expenses: {statistics.total_expenses():.2f}",
-            f"Balance:        {statistics.balance():.2f}",
-            "",
-            "Expenses by category:",
-        ]
+        total_income = statistics.total_income()
+        total_expenses = statistics.total_expenses()
+        balance = statistics.balance()
+
+        if balance >= 0:
+            balance_color = "#4ade80"
+        else:
+            balance_color = "#f87171"
+
+        summary_frame = ctk.CTkFrame(
+            self.statistics_frame,
+            fg_color="transparent",
+        )
+        summary_frame.pack(fill="x", padx=10, pady=(10, 6))
+
+        income_card = ctk.CTkFrame(summary_frame, fg_color="#242424", corner_radius=10)
+        income_card.pack(side="left", fill="both", expand=True, padx=(0, 6))
+
+        ctk.CTkLabel(
+            income_card,
+            text="Total income",
+            font=("Arial", 13),
+            text_color="gray",
+        ).pack(anchor="w", padx=12, pady=(10, 2))
+
+        ctk.CTkLabel(
+            income_card,
+            text=f"{total_income:.2f} BGN",
+            font=("Arial", 18, "bold"),
+            text_color="#4ade80",
+        ).pack(anchor="w", padx=12, pady=(0, 10))
+
+        expense_card = ctk.CTkFrame(summary_frame, fg_color="#242424", corner_radius=10)
+        expense_card.pack(side="left", fill="both", expand=True, padx=6)
+
+        ctk.CTkLabel(
+            expense_card,
+            text="Total expenses",
+            font=("Arial", 13),
+            text_color="gray",
+        ).pack(anchor="w", padx=12, pady=(10, 2))
+
+        ctk.CTkLabel(
+            expense_card,
+            text=f"{total_expenses:.2f} BGN",
+            font=("Arial", 18, "bold"),
+            text_color="#f87171",
+        ).pack(anchor="w", padx=12, pady=(0, 10))
+
+        balance_card = ctk.CTkFrame(summary_frame, fg_color="#242424", corner_radius=10)
+        balance_card.pack(side="left", fill="both", expand=True, padx=(6, 0))
+
+        ctk.CTkLabel(
+            balance_card,
+            text="Balance",
+            font=("Arial", 13),
+            text_color="gray",
+        ).pack(anchor="w", padx=12, pady=(10, 2))
+
+        ctk.CTkLabel(
+            balance_card,
+            text=f"{balance:.2f} BGN",
+            font=("Arial", 18, "bold"),
+            text_color=balance_color,
+        ).pack(anchor="w", padx=12, pady=(0, 10))
+
+        expenses_title = ctk.CTkLabel(
+            self.statistics_frame,
+            text="Expenses by category",
+            font=("Arial", 16, "bold"),
+            anchor="w",
+        )
+        expenses_title.pack(fill="x", padx=12, pady=(16, 6))
 
         expenses = statistics.expenses_by_category()
-        if expenses:
+        if not expenses:
+            ctk.CTkLabel(
+                self.statistics_frame,
+                text="No expenses yet.",
+                font=("Arial", 13),
+                text_color="gray",
+            ).pack(anchor="w", padx=12, pady=4)
+        else:
             for category, amount in expenses.items():
-                lines.append(f"  {category}: {amount:.2f}")
-        else:
-            lines.append("  No expenses yet.")
-
-        lines.append("")
-        lines.append("Monthly summary:")
-        monthly_summary = statistics.monthly_summary()
-        if monthly_summary:
-            for month, data in monthly_summary.items():
-                lines.append(
-                    f"  {month}: income {data['income']:.2f}, "
-                    f"expense {data['expense']:.2f}, balance {data['balance']:.2f}"
+                card = ctk.CTkFrame(
+                    self.statistics_frame,
+                    fg_color="#242424",
+                    corner_radius=10,
                 )
+                card.pack(fill="x", padx=10, pady=4)
+
+                ctk.CTkLabel(
+                    card,
+                    text=category,
+                    font=("Arial", 14, "bold"),
+                    anchor="w",
+                ).pack(side="left", padx=12, pady=8)
+
+                ctk.CTkLabel(
+                    card,
+                    text=f"{amount:.2f} BGN",
+                    font=("Arial", 14),
+                    text_color="#f87171",
+                    anchor="e",
+                ).pack(side="right", padx=12, pady=8)
+
+        monthly_title = ctk.CTkLabel(
+            self.statistics_frame,
+            text="Monthly summary",
+            font=("Arial", 16, "bold"),
+            anchor="w",
+        )
+        monthly_title.pack(fill="x", padx=12, pady=(16, 6))
+
+        monthly_summary = statistics.monthly_summary()
+        if not monthly_summary:
+            ctk.CTkLabel(
+                self.statistics_frame,
+                text="No transactions yet.",
+                font=("Arial", 13),
+                text_color="gray",
+            ).pack(anchor="w", padx=12, pady=4)
         else:
-            lines.append("  No transactions yet.")
+            for month, data in monthly_summary.items():
+                month_balance = data["balance"]
+                if month_balance >= 0:
+                    month_balance_color = "#4ade80"
+                else:
+                    month_balance_color = "#f87171"
 
-        self.statistics_box.configure(state="normal")
-        self.statistics_box.delete("1.0", "end")
-        self.statistics_box.insert("end", "\n".join(lines))
-        self.statistics_box.configure(state="disabled")
+                card = ctk.CTkFrame(
+                    self.statistics_frame,
+                    fg_color="#242424",
+                    corner_radius=10,
+                )
+                card.pack(fill="x", padx=10, pady=4)
 
-    def generate_report(self) -> None:
-        try:
-            path = ReportGenerator(self.manager.statistics()).monthly_text_report()
-            messagebox.showinfo("BudgetFlow", f"Report generated: {path}")
-        except ValueError as error:
-            messagebox.showerror("BudgetFlow", str(error))
+                ctk.CTkLabel(
+                    card,
+                    text=month,
+                    font=("Arial", 14, "bold"),
+                    anchor="w",
+                ).pack(fill="x", padx=12, pady=(8, 2))
 
-    def generate_charts(self) -> None:
-        try:
-            generator = ChartGenerator(self.manager.statistics())
-            paths = [generator.monthly_balance_chart()]
-            try:
-                paths.append(generator.expenses_by_category_chart())
-            except ValueError:
-                pass
-            messagebox.showinfo(
-                "BudgetFlow",
-                "Charts generated:\n" + "\n".join(str(path) for path in paths),
-            )
-        except ValueError as error:
-            messagebox.showerror("BudgetFlow", str(error))
+                ctk.CTkLabel(
+                    card,
+                    text=(
+                        f"Income {data['income']:.2f} BGN  |  "
+                        f"Expense {data['expense']:.2f} BGN  |  "
+                        f"Balance {data['balance']:.2f} BGN"
+                    ),
+                    font=("Arial", 13),
+                    text_color=month_balance_color,
+                    anchor="w",
+                ).pack(fill="x", padx=12, pady=(0, 8))
 
     def _clear_transaction_form(self) -> None:
         self.amount_entry.delete(0, "end")
