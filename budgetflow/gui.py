@@ -16,6 +16,7 @@ class BudgetFlowApp(ctk.CTk):
     def __init__(self, manager: FinanceManager) -> None:
         super().__init__()
         self.manager = manager
+        self.editing_transaction_id: int | None = None
 
         self.title("BudgetFlow")
         self.geometry("1050x780")
@@ -56,9 +57,12 @@ class BudgetFlowApp(ctk.CTk):
         form = ctk.CTkFrame(self.transactions_tab)
         form.grid(row=0, column=0, padx=10, pady=10, sticky="ns")
 
-        ctk.CTkLabel(form, text="Add transaction", font=("Arial", 18, "bold")).pack(
-            padx=15, pady=(15, 10)
+        self.transaction_form_title = ctk.CTkLabel(
+            form,
+            text="Add transaction",
+            font=("Arial", 18, "bold"),
         )
+        self.transaction_form_title.pack(padx=15, pady=(15, 10))
 
         self.amount_entry = ctk.CTkEntry(form, placeholder_text="Amount")
         self.amount_entry.pack(padx=15, pady=8)
@@ -85,8 +89,21 @@ class BudgetFlowApp(ctk.CTk):
         self.description_entry = ctk.CTkEntry(form, placeholder_text="Description")
         self.description_entry.pack(padx=15, pady=8)
 
-        add_button = ctk.CTkButton(form, text="Save", command=self.add_transaction)
-        add_button.pack(padx=15, pady=(12, 8))
+        self.save_transaction_button = ctk.CTkButton(
+            form,
+            text="Save transaction",
+            command=self.save_transaction,
+        )
+        self.save_transaction_button.pack(padx=15, pady=(12, 8), fill="x")
+
+        self.cancel_edit_button = ctk.CTkButton(
+            form,
+            text="Cancel edit",
+            command=self.cancel_transaction_edit,
+            fg_color="#444444",
+            hover_color="#555555",
+        )
+        self.cancel_edit_button.pack(padx=15, pady=(0, 8), fill="x")
 
         refresh_button = ctk.CTkButton(form, text="Refresh", command=self.refresh_data)
         refresh_button.pack(padx=15, pady=8)
@@ -253,20 +270,78 @@ class BudgetFlowApp(ctk.CTk):
         except BudgetFlowError as error:
             messagebox.showerror("BudgetFlow", str(error))
 
-    def add_transaction(self) -> None:
+    def save_transaction(self) -> None:
         try:
-            self.manager.add_transaction(
-                amount=float(self.amount_entry.get()),
-                category=self.category_menu.get(),
-                transaction_type=self.type_menu.get(),
-                description=self.description_entry.get(),
-                transaction_date=self.date_entry.get_date().isoformat(),
-            )
+            amount = float(self.amount_entry.get())
+            category = self.category_menu.get()
+            transaction_type = self.type_menu.get()
+            description = self.description_entry.get()
+            transaction_date = self.date_entry.get_date().isoformat()
+
+            if self.editing_transaction_id is None:
+                self.manager.add_transaction(
+                    amount=amount,
+                    category=category,
+                    transaction_type=transaction_type,
+                    description=description,
+                    transaction_date=transaction_date,
+                )
+                success_message = "Transaction saved successfully."
+            else:
+                self.manager.update_transaction(
+                    transaction_id=self.editing_transaction_id,
+                    amount=amount,
+                    category=category,
+                    transaction_type=transaction_type,
+                    description=description,
+                    transaction_date=transaction_date,
+                )
+                success_message = "Transaction updated successfully."
+
             self._clear_transaction_form()
             self.refresh_data()
-            messagebox.showinfo("BudgetFlow", "Transaction saved successfully.")
+            messagebox.showinfo("BudgetFlow", success_message)
         except (BudgetFlowError, ValueError) as error:
             messagebox.showerror("BudgetFlow", str(error))
+
+    def add_transaction(self) -> None:
+        self.save_transaction()
+
+    def start_transaction_edit(self, transaction_id: int | None) -> None:
+        if transaction_id is None:
+            messagebox.showerror("BudgetFlow", "Transaction was not found.")
+            return
+
+        try:
+            transaction = self.manager.get_transaction(transaction_id)
+        except BudgetFlowError:
+            messagebox.showerror("BudgetFlow", "Transaction was not found.")
+            return
+
+        self.editing_transaction_id = transaction_id
+        self.transaction_form_title.configure(
+            text=f"Edit transaction #{transaction_id}"
+        )
+        self.save_transaction_button.configure(text="Save changes")
+
+        self.amount_entry.delete(0, "end")
+        self.amount_entry.insert(0, f"{transaction.amount:.2f}")
+
+        self.category_menu.set(transaction.category)
+
+        transaction_type = transaction.transaction_type
+        if hasattr(transaction_type, "value"):
+            transaction_type = transaction_type.value
+        self.type_menu.set(str(transaction_type))
+
+        if transaction.transaction_date is not None:
+            self.date_entry.set_date(transaction.transaction_date)
+
+        self.description_entry.delete(0, "end")
+        self.description_entry.insert(0, transaction.description)
+
+    def cancel_transaction_edit(self) -> None:
+        self._clear_transaction_form()
 
     def delete_transaction(self) -> None:
         try:
@@ -486,6 +561,18 @@ class BudgetFlowApp(ctk.CTk):
                 justify="left",
                 wraplength=620,
             ).pack(fill="x", padx=12, pady=(0, 10))
+
+            buttons_row = ctk.CTkFrame(card, fg_color="transparent")
+            buttons_row.pack(fill="x", padx=12, pady=(0, 10))
+
+            ctk.CTkButton(
+                buttons_row,
+                text="Edit",
+                width=80,
+                command=lambda selected_id=transaction.id: (
+                    self.start_transaction_edit(selected_id)
+                ),
+            ).pack(side="left")
 
     def _refresh_budgets(self) -> None:
         for widget in self.budgets_frame.winfo_children():
@@ -717,12 +804,12 @@ class BudgetFlowApp(ctk.CTk):
                 ).pack(fill="x", padx=12, pady=(0, 8))
 
     def _clear_transaction_form(self) -> None:
+        self.editing_transaction_id = None
+        self.transaction_form_title.configure(text="Add transaction")
+        self.save_transaction_button.configure(text="Save transaction")
         self.amount_entry.delete(0, "end")
         self.description_entry.delete(0, "end")
-        # self.date_entry.delete(0, "end")
         self.type_menu.set("expense")
 
     def _clear_budget_form(self) -> None:
-        # self.budget_category_entry.delete(0, "end")
-        # self.budget_month_entry.delete(0, "end")
         self.budget_limit_entry.delete(0, "end")

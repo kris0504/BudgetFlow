@@ -51,6 +51,15 @@ class TestFinanceManagerTransactions(FinanceManagerTestCase):
         self.manager.delete_transaction(transaction.id)
         self.assertEqual(self.manager.list_transactions(), [])
 
+    def test_get_transaction_through_manager(self):
+        transaction = self.manager.add_expense(35, "Food", "Lunch", "2026-07-02")
+
+        loaded = self.manager.get_transaction(transaction.id)
+
+        self.assertEqual(loaded.id, transaction.id)
+        self.assertEqual(loaded.amount, 35)
+        self.assertEqual(loaded.category, "Food")
+
 
 class TestFinanceManagerBudgets(FinanceManagerTestCase):
     def test_budget_status_when_budget_is_not_exceeded(self):

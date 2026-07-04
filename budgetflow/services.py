@@ -83,6 +83,9 @@ class FinanceManager:
     def list_transactions(self) -> list[Transaction]:
         return self.storage.list_transactions()
 
+    def get_transaction(self, transaction_id: int) -> Transaction:
+        return self.storage.get_transaction(transaction_id)
+
     def search_transactions(
         self,
         category: str | None = None,
