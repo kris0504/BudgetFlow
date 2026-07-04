@@ -6,7 +6,7 @@ import customtkinter as ctk
 from tkcalendar import DateEntry
 from datetime import date
 from budgetflow.charts import ChartGenerator
-from budgetflow.errors import BudgetFlowError
+from budgetflow.errors import BudgetFlowError, ValidationError
 from budgetflow.reports import ReportGenerator
 from budgetflow.services import FinanceManager
 
@@ -93,6 +93,27 @@ class BudgetFlowApp(ctk.CTk):
         if categories:
             return categories
         return ["Other"]
+
+    @staticmethod
+    def _read_positive_float(entry: ctk.CTkEntry, field_name: str) -> float:
+        value = entry.get().strip()
+
+        if not value:
+            raise ValidationError(f"{field_name} is required.")
+
+        value = value.replace(",", ".")
+
+        try:
+            number = float(value)
+        except ValueError as exc:
+            raise ValidationError(
+                f"{field_name} must be a number, for example 25.50."
+            ) from exc
+
+        if number <= 0:
+            raise ValidationError(f"{field_name} must be greater than zero.")
+
+        return number
 
     def _create_transactions_tab(self) -> None:
         self.transactions_tab.grid_columnconfigure(0, weight=0)
@@ -304,7 +325,7 @@ class BudgetFlowApp(ctk.CTk):
 
     def save_transaction(self) -> None:
         try:
-            amount = float(self.amount_entry.get())
+            amount = self._read_positive_float(self.amount_entry, "Amount")
             category = self.category_menu.get()
             transaction_type = self.type_menu.get()
             description = self.description_entry.get()
@@ -333,7 +354,7 @@ class BudgetFlowApp(ctk.CTk):
             self._clear_transaction_form()
             self.refresh_data()
             messagebox.showinfo("BudgetFlow", success_message)
-        except (BudgetFlowError, ValueError) as error:
+        except BudgetFlowError as error:
             messagebox.showerror("BudgetFlow", str(error))
 
     def add_transaction(self) -> None:
@@ -401,12 +422,14 @@ class BudgetFlowApp(ctk.CTk):
             self.manager.set_budget(
                 category=self.budget_category_menu.get(),
                 month=self.budget_month_entry.get_month(),
-                limit=float(self.budget_limit_entry.get()),
+                limit=self._read_positive_float(
+                    self.budget_limit_entry, "Budget limit"
+                ),
             )
             self._clear_budget_form()
             self.refresh_data()
             messagebox.showinfo("BudgetFlow", "Budget saved successfully.")
-        except (BudgetFlowError, ValueError) as error:
+        except BudgetFlowError as error:
             messagebox.showerror("BudgetFlow", str(error))
 
     def delete_budget(self) -> None:
