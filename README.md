@@ -177,6 +177,3 @@ The tests focus on:
 
 The graphical framework itself is not tested directly. Instead, the application logic is separated from the interface so it can be tested independently.
 
-## Author
-
-Kristiyan Todorov
