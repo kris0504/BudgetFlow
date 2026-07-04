@@ -23,11 +23,16 @@ class TestReportGenerator(unittest.TestCase):
 
         content = generator.monthly_text_report("2026-07")
 
-        self.assertIn("BudgetFlow report for 2026-07", content)
-        self.assertIn("Income:  1000.00", content)
-        self.assertIn("Expense: 250.00", content)
-        self.assertIn("Balance: 750.00", content)
-        self.assertIn("Food: 250.00", content)
+        self.assertIn("BUDGETFLOW REPORT — 2026-07", content)
+        self.assertIn("OVERVIEW", content)
+        self.assertIn("Income               : 1000.00 BGN", content)
+        self.assertIn("Expenses             : 250.00 BGN", content)
+        self.assertIn("Balance              : 750.00 BGN", content)
+        self.assertIn("Savings rate         : 75.00%", content)
+        self.assertIn("EXPENSES BY CATEGORY", content)
+        self.assertIn("Food", content)
+        self.assertIn("250.00 BGN", content)
+        self.assertIn("Positive balance", content)
 
     def test_monthly_text_report_handles_empty_transactions(self):
         generator = ReportGenerator(StatisticsService([]))
@@ -41,8 +46,10 @@ class TestReportGenerator(unittest.TestCase):
 
         content = generator.monthly_text_report("2026-07")
 
-        self.assertIn("BudgetFlow report for 2026-07", content)
+        self.assertIn("BUDGETFLOW REPORT — 2026-07", content)
         self.assertIn("No expenses for this month.", content)
+        self.assertIn("Top expense category : N/A", content)
+        self.assertIn("Month status         : Break-even", content)
 
 
 class TestChartGenerator(unittest.TestCase):
