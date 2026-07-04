@@ -4,11 +4,56 @@ from tkinter import messagebox
 
 import customtkinter as ctk
 from tkcalendar import DateEntry
-
+from datetime import date
 from budgetflow.charts import ChartGenerator
 from budgetflow.errors import BudgetFlowError
 from budgetflow.reports import ReportGenerator
 from budgetflow.services import FinanceManager
+
+
+class MonthSelector(ctk.CTkFrame):
+    MONTH_VALUES = [f"{month:02d}" for month in range(1, 13)]
+
+    def __init__(self, master) -> None:
+        super().__init__(master, fg_color="transparent")
+
+        current_year = date.today().year
+        current_month = date.today().month
+
+        self.year_values = [
+            str(year) for year in range(current_year - 5, current_year + 6)
+        ]
+
+        self.month_menu = ctk.CTkOptionMenu(
+            self,
+            values=self.MONTH_VALUES,
+            width=70,
+        )
+        self.month_menu.set(f"{current_month:02d}")
+        self.month_menu.pack(side="left", padx=(0, 6))
+
+        self.year_menu = ctk.CTkOptionMenu(
+            self,
+            values=self.year_values,
+            width=90,
+        )
+        self.year_menu.set(str(current_year))
+        self.year_menu.pack(side="left")
+
+    def get_month(self) -> str:
+        return f"{self.year_menu.get()}-{self.month_menu.get()}"
+
+    def set_month(self, month: str) -> None:
+        year, month_number = month.split("-", 1)
+        month_number = month_number[:2]
+
+        if year not in self.year_values:
+            self.year_values.append(year)
+            self.year_values.sort()
+            self.year_menu.configure(values=self.year_values)
+
+        self.year_menu.set(year)
+        self.month_menu.set(month_number)
 
 
 class BudgetFlowApp(ctk.CTk):
@@ -148,14 +193,7 @@ class BudgetFlowApp(ctk.CTk):
         self.budget_category_menu.pack(padx=15, pady=(0, 8), fill="x")
 
         ctk.CTkLabel(form, text="Budget month").pack(padx=15, pady=(8, 2))
-        self.budget_month_entry = DateEntry(
-            form,
-            date_pattern="yyyy-mm-dd",
-            width=18,
-            background="#1f6aa5",
-            foreground="white",
-            borderwidth=2,
-        )
+        self.budget_month_entry = MonthSelector(form)
         self.budget_month_entry.pack(padx=15, pady=(0, 8))
 
         self.budget_limit_entry = ctk.CTkEntry(form, placeholder_text="Limit")
@@ -229,23 +267,17 @@ class BudgetFlowApp(ctk.CTk):
         button_frame.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
 
         ctk.CTkLabel(button_frame, text="Month").pack(side="left", padx=(8, 4), pady=8)
-        self.statistics_month_entry = DateEntry(
-            button_frame,
-            date_pattern="yyyy-mm-dd",
-            width=12,
-            background="#1f6aa5",
-            foreground="white",
-            borderwidth=2,
-        )
+        self.statistics_month_entry = MonthSelector(button_frame)
+
         self.statistics_month_entry.pack(side="left", padx=(0, 8), pady=8)
 
         ctk.CTkButton(
             button_frame, text="Refresh statistics", command=self.refresh_data
         ).pack(side="left", padx=8, pady=8)
 
-        ctk.CTkButton(
-            button_frame, text="Show report", command=self.show_report
-        ).pack(side="left", padx=8, pady=8)
+        ctk.CTkButton(button_frame, text="Show report", command=self.show_report).pack(
+            side="left", padx=8, pady=8
+        )
 
         ctk.CTkButton(
             button_frame, text="Show balance chart", command=self.show_balance_chart
@@ -388,7 +420,7 @@ class BudgetFlowApp(ctk.CTk):
 
     def delete_budget(self) -> None:
         category = self.budget_category_menu.get()
-        month = self.budget_month_entry.get_date().strftime("%Y-%m")
+        month = self.budget_month_entry.get_month()
 
         if not messagebox.askyesno(
             "BudgetFlow", f"Delete budget for {category} in {month}?"
@@ -404,7 +436,7 @@ class BudgetFlowApp(ctk.CTk):
             messagebox.showerror("BudgetFlow", str(error))
 
     def _selected_statistics_month(self) -> str:
-        return self.statistics_month_entry.get_date().strftime("%Y-%m")
+        return self.statistics_month_entry.get_month()
 
     def show_report(self) -> None:
         month = self._selected_statistics_month()
@@ -421,7 +453,9 @@ class BudgetFlowApp(ctk.CTk):
     def show_expenses_chart(self) -> None:
         month = self._selected_statistics_month()
         try:
-            figure = ChartGenerator(self.manager.statistics()).expenses_by_category_chart(month)
+            figure = ChartGenerator(
+                self.manager.statistics()
+            ).expenses_by_category_chart(month)
             self._show_chart_window(f"Expenses by category chart - {month}", figure)
         except ValueError as error:
             messagebox.showerror("BudgetFlow", str(error))
