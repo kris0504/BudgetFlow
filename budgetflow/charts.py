@@ -1,51 +1,46 @@
 from __future__ import annotations
 
-from pathlib import Path
+from matplotlib.figure import Figure
 
 from budgetflow.statistics import StatisticsService
 
 
 class ChartGenerator:
-    """Generates image files with charts."""
+    """Builds chart figures from financial statistics."""
 
-    def __init__(
-        self, statistics: StatisticsService, output_directory: str | Path = "reports"
-    ) -> None:
+    def __init__(self, statistics: StatisticsService) -> None:
         self.statistics = statistics
-        self.output_directory = Path(output_directory)
-        self.output_directory.mkdir(parents=True, exist_ok=True)
 
-    def expenses_by_category_chart(
-        self, filename: str = "expenses_by_category.png"
-    ) -> Path:
-        import matplotlib.pyplot as plt
-
-        data = self.statistics.expenses_by_category()
-        output_path = self.output_directory / filename
+    def expenses_by_category_chart(self, month: str | None = None) -> Figure:
+        data = self.statistics.expenses_by_category(month)
 
         if not data:
-            raise ValueError("There are no expenses to visualize.")
+            if month is None:
+                raise ValueError("There are no expenses to visualize.")
+            raise ValueError(f"There are no expenses to visualize for {month}.")
 
         categories = list(data.keys())
         amounts = list(data.values())
 
-        plt.figure(figsize=(8, 5))
-        plt.bar(categories, amounts)
-        plt.title("Expenses by category")
-        plt.xlabel("Category")
-        plt.ylabel("Amount")
-        plt.xticks(rotation=30, ha="right")
-        plt.tight_layout()
-        plt.savefig(output_path)
-        plt.close()
+        figure = Figure(figsize=(8, 5), dpi=100)
+        axes = figure.add_subplot(111)
+        axes.bar(categories, amounts)
 
-        return output_path
+        if month is None:
+            title = "Expenses by category"
+        else:
+            title = f"Expenses by category for {month}"
 
-    def monthly_balance_chart(self, filename: str = "monthly_balance.png") -> Path:
-        import matplotlib.pyplot as plt
+        axes.set_title(title)
+        axes.set_xlabel("Category")
+        axes.set_ylabel("Amount")
+        axes.tick_params(axis="x", rotation=30)
+        figure.tight_layout()
 
+        return figure
+
+    def monthly_balance_chart(self) -> Figure:
         summary = self.statistics.monthly_summary()
-        output_path = self.output_directory / filename
 
         if not summary:
             raise ValueError("There are no transactions to visualize.")
@@ -53,13 +48,12 @@ class ChartGenerator:
         months = list(reversed(summary.keys()))
         balances = [summary[month]["balance"] for month in months]
 
-        plt.figure(figsize=(8, 5))
-        plt.plot(months, balances, marker="o")
-        plt.title("Monthly balance")
-        plt.xlabel("Month")
-        plt.ylabel("Balance")
-        plt.tight_layout()
-        plt.savefig(output_path)
-        plt.close()
+        figure = Figure(figsize=(8, 5), dpi=100)
+        axes = figure.add_subplot(111)
+        axes.plot(months, balances, marker="o")
+        axes.set_title("Monthly balance")
+        axes.set_xlabel("Month")
+        axes.set_ylabel("Balance")
+        figure.tight_layout()
 
-        return output_path
+        return figure

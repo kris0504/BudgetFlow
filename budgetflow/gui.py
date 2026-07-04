@@ -228,16 +228,31 @@ class BudgetFlowApp(ctk.CTk):
         button_frame = ctk.CTkFrame(frame)
         button_frame.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
 
+        ctk.CTkLabel(button_frame, text="Month").pack(side="left", padx=(8, 4), pady=8)
+        self.statistics_month_entry = DateEntry(
+            button_frame,
+            date_pattern="yyyy-mm-dd",
+            width=12,
+            background="#1f6aa5",
+            foreground="white",
+            borderwidth=2,
+        )
+        self.statistics_month_entry.pack(side="left", padx=(0, 8), pady=8)
+
         ctk.CTkButton(
             button_frame, text="Refresh statistics", command=self.refresh_data
         ).pack(side="left", padx=8, pady=8)
 
         ctk.CTkButton(
-            button_frame, text="Generate report", command=self.generate_report
+            button_frame, text="Show report", command=self.show_report
         ).pack(side="left", padx=8, pady=8)
 
         ctk.CTkButton(
-            button_frame, text="Generate charts", command=self.generate_charts
+            button_frame, text="Show balance chart", command=self.show_balance_chart
+        ).pack(side="left", padx=8, pady=8)
+
+        ctk.CTkButton(
+            button_frame, text="Show expenses chart", command=self.show_expenses_chart
         ).pack(side="left", padx=8, pady=8)
 
         self.statistics_frame = ctk.CTkScrollableFrame(
@@ -388,29 +403,51 @@ class BudgetFlowApp(ctk.CTk):
         except BudgetFlowError as error:
             messagebox.showerror("BudgetFlow", str(error))
 
-    def generate_report(self) -> None:
+    def _selected_statistics_month(self) -> str:
+        return self.statistics_month_entry.get_date().strftime("%Y-%m")
+
+    def show_report(self) -> None:
+        month = self._selected_statistics_month()
+        report = ReportGenerator(self.manager.statistics()).monthly_text_report(month)
+        self._show_report_window(f"Monthly report - {month}", report)
+
+    def show_balance_chart(self) -> None:
         try:
-            path = ReportGenerator(self.manager.statistics()).monthly_text_report()
-            messagebox.showinfo("BudgetFlow", f"Report generated: {path}")
+            figure = ChartGenerator(self.manager.statistics()).monthly_balance_chart()
+            self._show_chart_window("Monthly balance chart", figure)
         except ValueError as error:
             messagebox.showerror("BudgetFlow", str(error))
 
-    def generate_charts(self) -> None:
+    def show_expenses_chart(self) -> None:
+        month = self._selected_statistics_month()
         try:
-            generator = ChartGenerator(self.manager.statistics())
-            paths = [generator.monthly_balance_chart()]
-
-            try:
-                paths.append(generator.expenses_by_category_chart())
-            except ValueError:
-                pass
-
-            messagebox.showinfo(
-                "BudgetFlow",
-                "Charts generated:\n" + "\n".join(str(path) for path in paths),
-            )
+            figure = ChartGenerator(self.manager.statistics()).expenses_by_category_chart(month)
+            self._show_chart_window(f"Expenses by category chart - {month}", figure)
         except ValueError as error:
             messagebox.showerror("BudgetFlow", str(error))
+
+    def _show_report_window(self, title: str, content: str) -> None:
+        window = ctk.CTkToplevel(self)
+        window.title(title)
+        window.geometry("620x520")
+        window.transient(self)
+
+        textbox = ctk.CTkTextbox(window, wrap="word")
+        textbox.pack(fill="both", expand=True, padx=15, pady=15)
+        textbox.insert("1.0", content)
+        textbox.configure(state="disabled")
+
+    def _show_chart_window(self, title: str, figure) -> None:
+        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+        window = ctk.CTkToplevel(self)
+        window.title(title)
+        window.geometry("850x600")
+        window.transient(self)
+
+        canvas = FigureCanvasTkAgg(figure, master=window)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill="both", expand=True, padx=15, pady=15)
 
     def refresh_data(self) -> None:
         self._refresh_category_menus()
@@ -646,6 +683,7 @@ class BudgetFlowApp(ctk.CTk):
             widget.destroy()
 
         statistics = self.manager.statistics()
+        selected_month = self._selected_statistics_month()
 
         total_income = statistics.total_income()
         total_expenses = statistics.total_expenses()
@@ -715,17 +753,17 @@ class BudgetFlowApp(ctk.CTk):
 
         expenses_title = ctk.CTkLabel(
             self.statistics_frame,
-            text="Expenses by category",
+            text=f"Expenses by category for {selected_month}",
             font=("Arial", 16, "bold"),
             anchor="w",
         )
         expenses_title.pack(fill="x", padx=12, pady=(16, 6))
 
-        expenses = statistics.expenses_by_category()
+        expenses = statistics.expenses_by_category(selected_month)
         if not expenses:
             ctk.CTkLabel(
                 self.statistics_frame,
-                text="No expenses yet.",
+                text="No expenses for selected month.",
                 font=("Arial", 13),
                 text_color="gray",
             ).pack(anchor="w", padx=12, pady=4)

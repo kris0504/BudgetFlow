@@ -1,23 +1,23 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from budgetflow.statistics import StatisticsService
 
 
 class ReportGenerator:
-    def __init__(self, statistics: StatisticsService, output_directory: str | Path = "reports") -> None:
-        self.statistics = statistics
-        self.output_directory = Path(output_directory)
-        self.output_directory.mkdir(parents=True, exist_ok=True)
+    """Builds text reports from financial statistics."""
 
-    def monthly_text_report(self, filename: str = "monthly_report.txt") -> Path:
-        output_path = self.output_directory / filename
+    def __init__(self, statistics: StatisticsService) -> None:
+        self.statistics = statistics
+
+    def monthly_text_report(self, month: str | None = None) -> str:
+        if month is not None:
+            return self._single_month_report(month)
+
         monthly_summary = self.statistics.monthly_summary()
 
         lines = ["BudgetFlow monthly report", "=========================", ""]
-        for month, data in monthly_summary.items():
-            lines.append(f"{month}")
+        for current_month, data in monthly_summary.items():
+            lines.append(f"{current_month}")
             lines.append(f"  Income:  {data['income']:.2f}")
             lines.append(f"  Expense: {data['expense']:.2f}")
             lines.append(f"  Balance: {data['balance']:.2f}")
@@ -26,7 +26,27 @@ class ReportGenerator:
         if not monthly_summary:
             lines.append("No transactions yet.")
 
-        with open(output_path, "w", encoding="utf-8") as file:
-            file.write("\n".join(lines))
+        return "\n".join(lines)
 
-        return output_path
+    def _single_month_report(self, month: str) -> str:
+        data = self.statistics.monthly_totals(month)
+        expenses = self.statistics.expenses_by_category(month)
+
+        lines = [
+            f"BudgetFlow report for {month}",
+            "============================",
+            "",
+            f"Income:  {data['income']:.2f}",
+            f"Expense: {data['expense']:.2f}",
+            f"Balance: {data['balance']:.2f}",
+            "",
+            "Expenses by category:",
+        ]
+
+        if not expenses:
+            lines.append("  No expenses for this month.")
+        else:
+            for category, amount in expenses.items():
+                lines.append(f"  {category}: {amount:.2f}")
+
+        return "\n".join(lines)

@@ -26,6 +26,16 @@ class TestStatisticsService(unittest.TestCase):
             {"Food": 250.56, "Transport": 100.0},
         )
 
+    def test_groups_expenses_by_category_for_selected_month(self):
+        self.assertEqual(
+            self.statistics.expenses_by_category("2026-07"),
+            {"Food": 250.56},
+        )
+        self.assertEqual(
+            self.statistics.expenses_by_category("2026-06"),
+            {"Transport": 100.0},
+        )
+
     def test_groups_income_by_category(self):
         self.assertEqual(
             self.statistics.income_by_category(),
@@ -47,6 +57,12 @@ class TestStatisticsService(unittest.TestCase):
             [("Food", 250.56)],
         )
 
+    def test_top_expense_categories_can_filter_by_month(self):
+        self.assertEqual(
+            self.statistics.top_expense_categories(limit=3, month="2026-06"),
+            [("Transport", 100.0)],
+        )
+
     def test_empty_statistics_return_zero_values(self):
         statistics = StatisticsService([])
 
@@ -56,6 +72,10 @@ class TestStatisticsService(unittest.TestCase):
         self.assertEqual(statistics.expenses_by_category(), {})
         self.assertEqual(statistics.income_by_category(), {})
         self.assertEqual(statistics.monthly_summary(), {})
+        self.assertEqual(
+            statistics.monthly_totals("2026-07"),
+            {"income": 0.0, "expense": 0.0, "balance": 0.0},
+        )
         self.assertEqual(statistics.top_expense_categories(), [])
 
 
