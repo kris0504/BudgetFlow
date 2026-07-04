@@ -148,7 +148,13 @@ class BudgetFlowApp(ctk.CTk):
             form, text="Save budget", command=self.save_budget
         )
         save_budget_button.pack(padx=15, pady=(12, 8), fill="x")
-
+        delete_budget_button = ctk.CTkButton(
+            form,
+            text="Delete budget",
+            command=self.delete_budget,
+            height=36,
+        )
+        delete_budget_button.pack(padx=15, pady=(4, 8), fill="x")
         self.budgets_frame = ctk.CTkScrollableFrame(
             self.budgets_tab,
             fg_color="#1a1a1a",
@@ -288,6 +294,23 @@ class BudgetFlowApp(ctk.CTk):
             self.refresh_data()
             messagebox.showinfo("BudgetFlow", "Budget saved successfully.")
         except (BudgetFlowError, ValueError) as error:
+            messagebox.showerror("BudgetFlow", str(error))
+
+    def delete_budget(self) -> None:
+        category = self.budget_category_menu.get()
+        month = self.budget_month_entry.get_date().strftime("%Y-%m")
+
+        if not messagebox.askyesno(
+            "BudgetFlow", f"Delete budget for {category} in {month}?"
+        ):
+            return
+
+        try:
+            self.manager.delete_budget(category, month)
+            self._clear_budget_form()
+            self.refresh_data()
+            messagebox.showinfo("BudgetFlow", "Budget deleted successfully.")
+        except BudgetFlowError as error:
             messagebox.showerror("BudgetFlow", str(error))
 
     def generate_report(self) -> None:

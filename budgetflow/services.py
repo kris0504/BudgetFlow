@@ -91,6 +91,9 @@ class FinanceManager:
     ) -> list[Transaction]:
         return self.storage.search_transactions(category, start_date, end_date)
 
+    def delete_budget(self, category: str, month: str) -> None:
+        self.storage.delete_budget(category, month)
+
     def set_budget(self, category: str, month: str, limit: float) -> Budget:
         return self.storage.set_budget(
             Budget(category=category, month=month, limit=limit)

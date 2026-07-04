@@ -226,6 +226,22 @@ class SQLiteStorage:
         self._connection.commit()
         return self.get_budget(budget.category, budget.month)
 
+    def delete_budget(self, category: str, month: str) -> None:
+        budget = Budget(category=category, month=month, limit=1)
+
+        cursor = self._connection.cursor()
+        cursor.execute(
+            "DELETE FROM budgets WHERE category = ? AND month = ?",
+            (budget.category, budget.month),
+        )
+
+        if cursor.rowcount == 0:
+            raise NotFoundError(
+                f"Budget for {budget.category} in {budget.month} was not found."
+            )
+
+        self._connection.commit()
+
     def get_budget(self, category: str, month: str) -> Budget:
         cursor = self._connection.cursor()
         cursor.execute(
