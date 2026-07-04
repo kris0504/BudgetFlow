@@ -153,21 +153,6 @@ class BudgetFlowApp(ctk.CTk):
         refresh_button = ctk.CTkButton(form, text="Refresh", command=self.refresh_data)
         refresh_button.pack(padx=15, pady=8)
 
-        ctk.CTkLabel(form, text="Delete transaction", font=("Arial", 15, "bold")).pack(
-            padx=15, pady=(12, 4)
-        )
-        self.delete_transaction_id_entry = ctk.CTkEntry(
-            form, placeholder_text="Transaction ID"
-        )
-        self.delete_transaction_id_entry.pack(padx=15, pady=8)
-
-        self.delete_transaction_button = ctk.CTkButton(
-            form,
-            text="Delete transaction",
-            command=self.delete_transaction,
-            height=38,
-        )
-        self.delete_transaction_button.pack(padx=15, pady=(6, 8), fill="x")
         self.transactions_frame = ctk.CTkScrollableFrame(
             self.transactions_tab,
             fg_color="#1a1a1a",
@@ -390,26 +375,32 @@ class BudgetFlowApp(ctk.CTk):
     def cancel_transaction_edit(self) -> None:
         self._clear_transaction_form()
 
-    def delete_transaction(self) -> None:
-        try:
-            transaction_id = int(self.delete_transaction_id_entry.get())
-            if not messagebox.askyesno(
-                "BudgetFlow", f"Delete transaction #{transaction_id}?"
-            ):
-                return
+    def delete_transaction(self, transaction_id: int | None) -> None:
+        if transaction_id is None:
+            messagebox.showerror("BudgetFlow", "Transaction was not found.")
+            return
 
+        if not messagebox.askyesno(
+            "BudgetFlow", f"Delete transaction #{transaction_id}?"
+        ):
+            return
+
+        try:
             self.manager.delete_transaction(transaction_id)
-            self.delete_transaction_id_entry.delete(0, "end")
+
+            if self.editing_transaction_id == transaction_id:
+                self._clear_transaction_form()
+
             self.refresh_data()
             messagebox.showinfo("BudgetFlow", "Transaction deleted successfully.")
-        except (BudgetFlowError, ValueError) as error:
+        except BudgetFlowError as error:
             messagebox.showerror("BudgetFlow", str(error))
 
     def save_budget(self) -> None:
         try:
             self.manager.set_budget(
                 category=self.budget_category_menu.get(),
-                month=self.budget_month_entry.get_date().strftime("%Y-%m"),
+                month=self.budget_month_entry.get_month(),
                 limit=float(self.budget_limit_entry.get()),
             )
             self._clear_budget_form()
@@ -463,10 +454,14 @@ class BudgetFlowApp(ctk.CTk):
     def _show_report_window(self, title: str, content: str) -> None:
         window = ctk.CTkToplevel(self)
         window.title(title)
-        window.geometry("620x520")
+        window.geometry("760x620")
         window.transient(self)
 
-        textbox = ctk.CTkTextbox(window, wrap="word")
+        textbox = ctk.CTkTextbox(
+            window,
+            wrap="none",
+            font=("Consolas", 14),
+        )
         textbox.pack(fill="both", expand=True, padx=15, pady=15)
         textbox.insert("1.0", content)
         textbox.configure(state="disabled")
@@ -644,6 +639,16 @@ class BudgetFlowApp(ctk.CTk):
                     self.start_transaction_edit(selected_id)
                 ),
             ).pack(side="left")
+            ctk.CTkButton(
+                buttons_row,
+                text="Delete",
+                width=80,
+                fg_color="#991b1b",
+                hover_color="#7f1d1d",
+                command=lambda selected_id=transaction.id: (
+                    self.delete_transaction(selected_id)
+                ),
+            ).pack(side="left", padx=(8, 0))
 
     def _refresh_budgets(self) -> None:
         for widget in self.budgets_frame.winfo_children():
@@ -719,9 +724,10 @@ class BudgetFlowApp(ctk.CTk):
         statistics = self.manager.statistics()
         selected_month = self._selected_statistics_month()
 
-        total_income = statistics.total_income()
-        total_expenses = statistics.total_expenses()
-        balance = statistics.balance()
+        monthly_totals = statistics.monthly_totals(selected_month)
+        total_income = monthly_totals["income"]
+        total_expenses = monthly_totals["expense"]
+        balance = monthly_totals["balance"]
 
         if balance >= 0:
             balance_color = "#4ade80"
