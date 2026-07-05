@@ -6,7 +6,6 @@ from budgetflow.models import Transaction, TransactionType
 
 
 class StatisticsService:
-    """Calculates totals and reports from transactions."""
 
     def __init__(self, transactions: list[Transaction]) -> None:
         self.transactions = transactions

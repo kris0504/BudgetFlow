@@ -6,7 +6,6 @@ from budgetflow.statistics import StatisticsService
 
 
 class ChartGenerator:
-    """Builds chart figures from financial statistics."""
 
     def __init__(self, statistics: StatisticsService) -> None:
         self.statistics = statistics
